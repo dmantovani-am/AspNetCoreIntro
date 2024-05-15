@@ -23,8 +23,10 @@ void MapEntity<TEntity>(string prefix)
     var group = app.MapGroup(prefix);
 
     // Read all.
-    group.MapGet("/", async (DataContext context) =>
+    group.MapGet("/", async (DataContext context, ILogger<TEntity> logger) =>
     {
+        logger.LogInformation("Getting all entities of type {EntityType}", typeof(TEntity).Name);
+
         var entities = await GetEntities(context).ToListAsync();
         return Results.Ok(entities);
     });
