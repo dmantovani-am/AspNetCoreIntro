@@ -1,6 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// https://nblumhardt.com/2024/04/serilog-net8-0-minimal/
+builder.Services.AddSerilog(logging => logging
+    .ReadFrom.Configuration(builder.Configuration));
 
 builder.Services.AddDbContext<DataContext>(options =>
 {
