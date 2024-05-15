@@ -10,32 +10,66 @@ builder.Services.AddDbContext<DataContext>(options =>
 
 var app = builder.Build();
 
-var group = app.MapGroup("/categories");
-
-// Read.
-group.MapGet("/", async (DataContext context) =>
-{
-    var categories = await context.Categories.ToListAsync();
-    return Results.Ok(categories);
-});
-
-// Read.
-group.MapGet("/{id:int}", async (DataContext context, int id) =>
-{
-    var category = await context.Categories.FindAsync(id);
-    return category is not null ? Results.Ok(category) : Results.NotFound();
-});
-
-// Create.
-group.MapPost("/", async (DataContext context, Category category) =>
-{
-    await context.Categories.AddAsync(category);
-    await context.SaveChangesAsync();
-
-    return Results.Created($"/categories/{category.Id}", category);
-});
+MapEntity<Category>("/categories");
+MapEntity<Product>("/products");
 
 app.Run();
+
+// Il main finisce qui
+
+void MapEntity<TEntity>(string prefix)
+    where TEntity : class, IHasId
+{
+    var group = app.MapGroup(prefix);
+
+    // Read all.
+    group.MapGet("/", async (DataContext context) =>
+    {
+        var entities = await GetEntities(context).ToListAsync();
+        return Results.Ok(entities);
+    });
+
+    // Read single.
+    group.MapGet("/{id:int}", async (DataContext context, int id) =>
+    {
+        var entity = await GetEntities(context).FindAsync(id);
+        return entity is not null ? Results.Ok(entity) : Results.NotFound();
+    });
+
+    // Create.
+    group.MapPost("/", async (DataContext context, TEntity entity) =>
+    {
+        await GetEntities(context).AddAsync(entity);
+        await context.SaveChangesAsync();
+
+        return Results.Created($"{prefix}/{entity.Id}", entity);
+    });
+
+    // Update
+    group.MapPut("/", async (DataContext context, TEntity entity) =>
+    {
+        context.Entry(entity).State = EntityState.Modified;
+        await context.SaveChangesAsync();
+
+        return Results.NoContent();
+    });
+
+    // Delete
+    group.MapDelete("/{id:int}", async (DataContext context, int id) =>
+    {
+        var entities = GetEntities(context);
+
+        var entity = await entities.FindAsync(id);
+        if (entity is null) return Results.NotFound();
+
+        entities.Remove(entity);
+        await context.SaveChangesAsync();
+
+        return Results.NoContent();
+    });
+
+    DbSet<TEntity> GetEntities(DataContext context) => context.Set<TEntity>();
+}
 
 class DataContext : DbContext
 {
@@ -48,7 +82,12 @@ class DataContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
 }
 
-record Category
+interface IHasId
+{
+    int Id { get; set; }
+}
+
+record Category : IHasId
 {
     public Category()
     {
@@ -62,7 +101,7 @@ record Category
     public ICollection<Product> Products { get; set; }
 }
 
-record Product
+record Product : IHasId
 {
     public Product()
     {
