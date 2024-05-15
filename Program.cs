@@ -8,19 +8,30 @@ builder.Services.AddDbContext<DataContext>(options =>
     options.UseSqlite(connectionString);
 });
 
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
 
-MapEntity<Category>("/categories");
-MapEntity<Product>("/products");
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+MapEntity<Category>("Categories");
+MapEntity<Product>("Products");
 
 app.Run();
 
 // Il main finisce qui
 
-void MapEntity<TEntity>(string prefix)
+void MapEntity<TEntity>(string name)
     where TEntity : class, IHasId
 {
-    var group = app.MapGroup(prefix);
+    var prefix = $"/{name}";
+    var group = app.MapGroup(prefix).WithTags(name);
+    var type = typeof(TEntity);
 
     // Read all.
     group.MapGet("/", async (DataContext context, ILogger<TEntity> logger) =>
@@ -29,7 +40,9 @@ void MapEntity<TEntity>(string prefix)
 
         var entities = await GetEntities(context).ToListAsync();
         return Results.Ok(entities);
-    });
+    })
+    .WithSummary($"Get all entities of type \"{type.Name}\"")
+    .WithDescription($"Get all entities of type \"{type.Name}\"");
 
     // Read single.
     group.MapGet("/{id:int}", async (DataContext context, int id) =>
@@ -44,7 +57,7 @@ void MapEntity<TEntity>(string prefix)
         await GetEntities(context).AddAsync(entity);
         await context.SaveChangesAsync();
 
-        return Results.Created($"{prefix}/{entity.Id}", entity);
+        return Results.Created($"{name}/{entity.Id}", entity);
     });
 
     // Update
